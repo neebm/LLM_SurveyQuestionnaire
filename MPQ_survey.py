@@ -1,16 +1,12 @@
-# model_name = "distilbert-base-uncased"  # or "bert-base-uncased"
-# tokenizer = AutoTokenizer.from_pretrained(model_name)
-# model = AutoModel.from_pretrained(model_name)
-
-pip install transformers sentence-transformers faiss-cpu streamlit
-
-
 import streamlit as st
 import torch
 from transformers import AutoModel, AutoTokenizer
 from sentence_transformers import SentenceTransformer, util
 import faiss
 import numpy as np
+import os
+
+torch.classes.__path__ = []
 
 # Load DistilBERT-based embedding model
 embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
@@ -43,26 +39,34 @@ if "step" not in st.session_state:
 if "responses" not in st.session_state:
     st.session_state["responses"] = []
 
+if "submitted" not in st.session_state:
+    st.session_state["submitted"] = False
+
 # Streamlit UI
-st.title("McGill Pain Questionnaire Facilitator")
+st.title("McGill Pain Questionnaire")
 
 # Display current question
 if st.session_state["step"] < len(mpq_questions):
     question = mpq_questions[st.session_state["step"]]
     st.subheader(question)
 
-    user_input = st.text_input("Your response:", "")
+    user_input = st.text_input("Your response:", "", key=st.session_state["step"])
 
     if st.button("Submit"):
         if user_input.strip():
             # Check if user asked a question
             input_embedding = embedding_model.encode(user_input, convert_to_tensor=True)
+            print(input_embedding)
             D, I = index.search(input_embedding.cpu().numpy().reshape(1, -1), 1)
             if D[0][0] < 0.5:  # Threshold for similarity
                 st.write(f"🤖 {faq[faq_questions[I[0][0]]]}")  # Answer detected question
             else:
                 st.session_state["responses"].append((question, user_input))
                 st.session_state["step"] += 1
+                st.session_state["submitted"] = True  # Mark as submitted to prevent re-submission
+
+        st.rerun()
+
 
 # Show summary when complete
 if st.session_state["step"] >= len(mpq_questions):
